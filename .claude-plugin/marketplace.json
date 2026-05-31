@@ -1,0 +1,14 @@
+{
+  "name": "qa-engineer-marketplace",
+  "owner": {
+    "name": "i-am-wizard"
+  },
+  "plugins": [
+    {
+      "name": "qa-engineer",
+      "source": "./",
+      "description": "Acceptance-test-driven QA pipeline with tiered execution (quick/standard/exhaustive). Reads tickets, maps the test surface, writes tests grounded in acceptance criteria, validates with real evidence, and accumulates per-service memory across runs.",
+      "version": "2.1.3"
+    }
+  ]
+}
