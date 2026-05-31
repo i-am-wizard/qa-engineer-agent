@@ -1,0 +1,72 @@
+---
+description: "Run the QA pipeline on a Jira ticket or feature description. Sequences qa-researcher → qa-writer → qa-validator → qa-curator and posts the result to Jira if an MCP is connected. Three tiers: --quick, --standard (default), --exhaustive. Usage: /qa [--quick|--exhaustive] <TICKET-KEY or feature description>"
+---
+
+# /qa - QA Pipeline
+
+Orchestrate the quality engineering pipeline for the given ticket or feature, at the requested tier.
+
+Arguments: $ARGUMENTS
+
+## Tier selection
+
+Three tiers, each running a different set of phases. Pick by matching the tier to the *risk and audit needs* of the change, not by personal preference.
+
+| Tier | Flag | Phases | Use when |
+|---|---|---|---|
+| Quick | `--quick` | research → write → validate | Typo fix, copy change, internal-only refactor, hotfix with regression test already written. Skips curator and Jira post - audit trail is reduced |
+| Standard | `--standard` or no flag | research → write → validate → curator → Jira post | Default for feature work, bug fixes touching shared state, anything reaching users. Full audit trail |
+| Exhaustive | `--exhaustive` | research → write → validate (with mutation + perf baseline + security boundary checks) → curator → Jira post | Pre-release on critical paths, payment / auth / data integrity changes, anything where the cost of a regression is high. See `skills/quality-engineer/references/tier-exhaustive.md` for the added checks |
+
+If no flag is given, run Standard. If the user passes both a tier flag and a `--force` flag, both apply.
+
+## Parse arguments
+
+1. Extract the tier flag (`--quick`, `--standard`, `--exhaustive`) if present. Default to standard
+2. Extract any `--force` flag (overrides the "pipeline already complete" guard)
+3. Remaining text is the ticket key or feature description
+
+## Guard clauses - checked before any work
+
+These exist to fail fast on obvious mistakes rather than waste a pipeline run discovering them halfway through.
+
+- Empty arguments → respond `Usage: /qa [--quick|--exhaustive] <TICKET-KEY or feature description>` and stop
+- Argument starts with `http` → respond `Pass a ticket key or feature description, not a URL` and stop. (URLs are unreliable as input - ticket keys are unambiguous)
+- Argument fewer than 3 characters → respond `Argument too short - provide a ticket key or a feature description of at least one sentence` and stop
+- No Jira MCP connected and argument matches `[A-Z]+-[0-9]+` → warn that the ticket can't be fetched and proceed treating the argument as a feature description. Ask the user for AC. (Silent failure here would lead to AC being inferred from code, which is the failure mode ATDD exists to prevent)
+
+## Step 0 - Resume check
+
+Before invoking any sub-agent, check `.claude/qa/` for prior artifacts. The resume protocol exists because long pipelines on real codebases get interrupted, and starting from scratch every time both wastes tokens and loses partial work.
+
+- `<TICKET>-quality-assessment.md` exists → pipeline already complete. Report and stop. If the user passed `--force`, proceed anyway
+- `<TICKET>-validation-report.md` exists → resume from the curator step (and Jira post if Standard or Exhaustive)
+- `<TICKET>-surface-map.md` with `# Status: COMPLETE` and referenced test files exist → skip qa-researcher and qa-writer, resume from qa-validator
+- `<TICKET>-surface-map.md` with `# Status: INCOMPLETE` → discard the partial map, re-run qa-researcher from scratch. (Resuming from a partial map produces inconsistent test coverage - the agent doesn't know what it didn't finish)
+- `<TICKET>-surface-map.md` with `# Status: COMPLETE` but no test files → skip qa-researcher, resume from qa-writer
+- No artifacts → run the full pipeline from the start
+
+## Pipeline sequence
+
+1. Apply the `quality-engineer` skill - its judgement layer governs every phase
+2. Resume check (above)
+3. Invoke **qa-researcher** with the ticket key or description (skip if Step 0 says so)
+4. Present the Test Surface Map to the user. If the map contains `⚠️ NO AC FOUND`, pause and escalate. Proceeding without AC means the tests will encode whatever the code does rather than what it should do - the discipline this pipeline exists to enforce
+5. Invoke **qa-writer** with the Test Surface Map (skip if Step 0 says so)
+6. Invoke **qa-validator** with the produced test files. **If --exhaustive was selected**, qa-validator additionally runs the checks in `skills/quality-engineer/references/tier-exhaustive.md`
+7. If qa-validator returns FAIL: return to qa-writer with the failure output. Two correction cycles, then escalate. (More than two correction cycles usually means the failure is structural rather than a test-writing error - human judgement helps more at that point than another machine cycle)
+8. If qa-validator returns PASS: compile the Quality Assessment per `skills/quality-engineer/references/output-templates.md` and write it to `.claude/qa/<TICKET>-quality-assessment.md`
+9. **If Standard or Exhaustive**: invoke **qa-curator** to update `.claude/qa/memory/<service>.md`. **If Quick**: skip
+10. **If Standard or Exhaustive**: if Jira MCP is connected, post the Quality Assessment as a comment on the ticket. **If Quick**: skip; note the reduced audit trail in the final summary
+
+## Doctrine the pipeline enforces
+
+These are framed as consequences and reasoning rather than rules - see `references/rationalizations.md` for why this matters. The doctrine is:
+
+- **AC traceability is what makes coverage intentional.** Without it, tests encode whatever the code happens to do - which means they'll pass against a bug. The pipeline halts on missing AC rather than infer it, because inferred AC is a worse audit trail than no AC
+- **A PASS verdict is only defensible with raw test output attached.** A summary alone leaves nothing to review - "the tests passed" without evidence is a claim, not a finding
+- **Bug fixes need a regression test that failed before the fix.** A fix without one is a patch; the regression will return when the surrounding code changes
+- **Two correction cycles is the budget.** More usually means the failure is structural, and human judgement is more useful than another machine cycle
+- **An incident closes when the signal returns to baseline.** Code merge alone is a hypothesis that the fix worked - the signal is the evidence
+
+The pipeline is structured to make doing the right thing the path of least resistance, rather than to forbid the wrong thing and hope the rule holds.

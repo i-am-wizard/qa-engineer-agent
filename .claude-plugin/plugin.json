@@ -1,0 +1,9 @@
+{
+  "name": "qa-engineer",
+  "version": "2.1.3",
+  "description": "Acceptance-test-driven QA pipeline with tiered execution (quick/standard/exhaustive). Reads tickets, maps the test surface, writes tests grounded in acceptance criteria, validates with real evidence, and accumulates per-service memory across runs.",
+  "author": {
+    "name": "Your Team"
+  },
+  "keywords": ["qa", "testing", "atdd", "playwright", "jira", "observability", "regression"]
+}

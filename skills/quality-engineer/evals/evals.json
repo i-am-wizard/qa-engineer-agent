@@ -1,0 +1,147 @@
+{
+  "skill": "quality-engineer",
+  "description": "Eval cases for the quality-engineer skill. Each entry contains a prompt and the expected behaviour. Run these through Claude periodically - particularly after changing the description or doctrine - to catch regressions in triggering and doctrine adherence.",
+  "cases": [
+    {
+      "id": "trigger-explicit-test-request",
+      "category": "triggering - positive",
+      "prompt": "Add tests for the new payment retry logic in services/payments/retry.py",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Asks for the AC or ticket reference before writing tests, or applies risk-based selection if context is clear."
+    },
+    {
+      "id": "trigger-pr-review",
+      "category": "triggering - positive (implicit)",
+      "prompt": "Is this PR ready to merge?",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Discusses coverage, regression risk, observability, AC traceability - does not just answer yes/no."
+    },
+    {
+      "id": "trigger-shipping-confidence",
+      "category": "triggering - positive (implicit)",
+      "prompt": "I'm about to deploy this - what could go wrong?",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Walks through failure modes, observability signals, rollback path. Not a generic 'be careful' answer."
+    },
+    {
+      "id": "trigger-incident",
+      "category": "triggering - positive (implicit)",
+      "prompt": "We're getting timeouts in production on the checkout endpoint",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Applies incident triage doctrine: reproduce first, find the signal, identify root cause not just symptom, write regression test before fix."
+    },
+    {
+      "id": "trigger-refactor-risk",
+      "category": "triggering - positive (the case v1 excluded)",
+      "prompt": "I'm refactoring the order service to extract a separate inventory module. What should I watch out for?",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Discusses regression risk surface, existing test coverage, testable seams. v1 explicitly excluded refactor questions - this case verifies v2's broader trigger fixed that gap."
+    },
+    {
+      "id": "trigger-ac-drafting",
+      "category": "triggering - positive (ATDD edge)",
+      "prompt": "We need to add a feature that lets users cancel their subscription within 30 days. Help me think it through.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Drafts acceptance criteria in Given/When/Then form before discussing implementation. Does not jump straight to code."
+    },
+    {
+      "id": "no-trigger-pure-explanation",
+      "category": "triggering - negative",
+      "prompt": "Explain how JavaScript closures work",
+      "expected_trigger": false,
+      "expected_behaviour": "Answers the conceptual question directly. Does NOT load quality-engineer. No mention of tests, AC, or coverage."
+    },
+    {
+      "id": "no-trigger-docs",
+      "category": "triggering - negative",
+      "prompt": "Write a README section explaining how to install our CLI",
+      "expected_trigger": false,
+      "expected_behaviour": "Writes the README section. Does NOT load quality-engineer."
+    },
+    {
+      "id": "no-trigger-code-walkthrough",
+      "category": "triggering - negative (close miss)",
+      "prompt": "Walk me through what this function does line by line",
+      "expected_trigger": false,
+      "expected_behaviour": "Explains the function. Does NOT load quality-engineer unless the user then asks about coverage or correctness."
+    },
+    {
+      "id": "doctrine-no-ac-no-tests",
+      "category": "doctrine adherence - ATDD",
+      "prompt": "/qa PROJECT-123 - the ticket has no acceptance criteria, just a description saying 'fix the bug where users see the wrong price'",
+      "expected_trigger": true,
+      "expected_behaviour": "qa-researcher emits the Test Surface Map with ⚠️ NO AC FOUND. /qa pauses and escalates - does NOT proceed to qa-writer. Does NOT silently infer AC from the bug description."
+    },
+    {
+      "id": "doctrine-regression-test-first",
+      "category": "doctrine adherence - bug fixes",
+      "prompt": "Users report that clicking 'Cancel' on the checkout page sometimes still places the order. I have a hypothesis about why. Should I just push the fix?",
+      "expected_trigger": true,
+      "expected_behaviour": "Applies incident triage doctrine: write a failing regression test that reproduces the bug FIRST, then the fix. Does not endorse 'just push the fix'."
+    },
+    {
+      "id": "doctrine-evidence-required",
+      "category": "doctrine adherence - verification",
+      "prompt": "I ran the tests and they look right, ready to ship",
+      "expected_trigger": true,
+      "expected_behaviour": "Asks for raw test output, not just a summary. References the 'seems right is not sufficient' rule. Asks about observability signals if relevant."
+    },
+    {
+      "id": "doctrine-rationalization-pushback",
+      "category": "doctrine adherence - rationalizations",
+      "prompt": "This change is just one line, I don't think it needs a test",
+      "expected_trigger": true,
+      "expected_behaviour": "Applies the rationalization response: size is independent of risk. Asks what contract / boundary / shared state the change touches. Does not flat-refuse; reasons it through."
+    },
+    {
+      "id": "graceful-degradation-no-jira",
+      "category": "MCP degradation",
+      "prompt": "/qa PROJECT-456 - assume no Jira MCP is connected",
+      "expected_trigger": true,
+      "expected_behaviour": "Command warns about missing Jira MCP, proceeds treating PROJECT-456 as a feature description rather than fetchable ticket. Asks user for AC directly. Does not silently fail or invent ticket content."
+    },
+    {
+      "id": "resume-protocol-incomplete-map",
+      "category": "artifact handling",
+      "prompt": "/qa PROJECT-789 - and .claude/qa/PROJECT-789-surface-map.md already exists with '# Status: INCOMPLETE' at the top",
+      "expected_trigger": true,
+      "expected_behaviour": "Discards the partial map, re-runs qa-researcher from scratch. Does NOT consume the incomplete map as if it were finished."
+    },
+    {
+      "id": "tier-quick-mode",
+      "category": "tiered execution (v2.1+)",
+      "prompt": "/qa --quick PROJECT-321 - small typo fix in an error message",
+      "expected_trigger": true,
+      "expected_behaviour": "Runs research + write + validate only. Skips curator and Jira post. Notes in output that this was a quick-mode run and standard audit trail is reduced."
+    },
+    {
+      "id": "tier-exhaustive-mode",
+      "category": "tiered execution (v2.1+)",
+      "prompt": "/qa --exhaustive PROJECT-654 - payment processing change before release",
+      "expected_trigger": true,
+      "expected_behaviour": "Adds mutation testing scenarios, performance baseline checks, and security boundary tests on top of standard pipeline. Validation report explicitly notes exhaustive-tier additions."
+    },
+    {
+      "id": "architecture-diagram-cross-service",
+      "category": "architecture mapping (v2.1.2+)",
+      "prompt": "I need to add a 'cancel subscription' feature. It needs to: 1) update the subscription record, 2) publish a SubscriptionCancelled event, 3) trigger a refund via the payments service, 4) send a notification email. Help me map the test surface.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Recognises the change spans >2 services and crosses an async boundary (event publication). Generates a Mermaid sequence diagram (or asks for one if details aren't inferable) showing the flow across subscription service, event bus, payments, and notification service. Each highlighted element maps to at least one scenario in the test plan."
+    },
+    {
+      "id": "architecture-diagram-skip-single-module",
+      "category": "architecture mapping (v2.1.2+)",
+      "prompt": "Add tests for a new helper function in utils/string_format.py that pads currency values to two decimal places",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Does NOT generate a Mermaid diagram - single-module change with linear data flow. The Test Surface Map omits the Architecture Impact section entirely rather than including an empty stub."
+    },
+    {
+      "id": "architecture-diagram-ask-rather-than-guess",
+      "category": "architecture mapping (v2.1.2+)",
+      "prompt": "The change publishes an InventoryDepleted event from the warehouse service. I don't have access to the consumer code - it lives in another team's repo.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Recognises the async boundary triggers a diagram but the consumer side is not inferable. Asks the user for an architecture sketch or description of the consumer rather than drawing a plausible-but-possibly-wrong diagram."
+    }
+  ],
+  "running": "These are designed to be run as Claude prompts in a fresh session with this skill installed. For each case, manually verify expected_trigger and expected_behaviour. Cases failing should drive description tuning (for trigger failures) or doctrine clarification in SKILL.md and agents (for behaviour failures)."
+}

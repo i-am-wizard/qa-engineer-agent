@@ -1,0 +1,11 @@
+---
+description: "Run only the validation phase. Executes the existing test suite, checks observability signals if MCPs are connected, and returns a Validation Report with raw evidence. Use when tests already exist and a signal-confirmed pass is needed. Usage: /qa-validate"
+---
+
+# /qa-validate - Validation-Only Phase
+
+Apply the `quality-engineer` skill, then invoke the **qa-validator** sub-agent.
+
+Run against the current test suite. Do not invoke qa-researcher or qa-writer.
+
+Return the full Validation Report with raw test runner output attached. Verdict must be PASS, FAIL, or BLOCKED - never inferred from a summary.
