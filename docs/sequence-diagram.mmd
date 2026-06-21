@@ -1,0 +1,131 @@
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor': '#ffffff',
+  'primaryTextColor': '#000000',
+  'primaryBorderColor': '#000000',
+  'lineColor': '#000000',
+  'textColor': '#000000',
+  'noteTextColor': '#000000',
+  'noteBkgColor': '#fff8d0',
+  'noteBorderColor': '#000000',
+  'actorTextColor': '#000000',
+  'actorBorder': '#000000',
+  'actorBkg': '#ffffff',
+  'actorLineColor': '#000000',
+  'signalColor': '#000000',
+  'signalTextColor': '#000000',
+  'labelTextColor': '#000000',
+  'labelBoxBkgColor': '#ffffff',
+  'labelBoxBorderColor': '#000000',
+  'loopTextColor': '#000000',
+  'sequenceNumberColor': '#ffffff',
+  'activationBkgColor': '#f4f4f4',
+  'activationBorderColor': '#000000'
+}}}%%
+sequenceDiagram
+    autonumber
+    participant User as User
+    participant QA as /qa command
+    participant R as qa-researcher
+    participant W as qa-writer
+    participant V as qa-validator
+    participant C as qa-curator
+    participant FS as .claude/qa/ artifacts
+    participant Jira
+    participant GH as GitHub
+    participant Obs as Playwright / Sentry / Datadog
+
+    User->>QA: /qa PROJECT-123 [--quick|--standard|--exhaustive] [--force]
+
+    rect rgb(245, 245, 235)
+    Note over QA: Apply quality-engineer skill (judgement layer for all phases)
+    end
+
+    rect rgb(245, 245, 235)
+    Note over QA: Step 0 - guard clauses + resume check
+    QA->>FS: read existing artifacts for PROJECT-123
+    FS-->>QA: surface-map / validation-report / quality-assessment (if any)
+    Note over QA: Resume logic:<br/>quality-assessment exists → stop (unless --force)<br/>validation-report exists → resume from curator<br/>map COMPLETE + tests exist → resume from validator<br/>map INCOMPLETE → discard, re-run researcher<br/>map COMPLETE + no tests → resume from writer<br/>no artifacts → full pipeline
+    end
+
+    rect rgb(225, 245, 238)
+    Note over R: Phase 1 - research (skipped if map already COMPLETE)
+    QA->>R: invoke with ticket key
+    R->>FS: read memory/<service>.md (if exists)
+    FS-->>R: prior failure patterns, fragile areas
+    R->>Jira: fetch ticket, AC, comments
+    Jira-->>R: ticket data
+    R->>GH: read diff + existing tests
+    GH-->>R: code + test files
+    R->>FS: write surface-map.md incrementally (Status: INCOMPLETE)
+    R->>FS: mark Status: COMPLETE
+    R-->>QA: map ref + AC status
+    end
+
+    QA->>User: present Test Surface Map
+
+    alt AC missing (⚠️ NO AC FOUND)
+        QA->>User: HALT - draft AC before proceeding
+    else AC present
+        rect rgb(225, 245, 238)
+        Note over W: Phase 2 - write (skipped if test files already exist)
+        QA->>W: invoke with surface map
+        W->>FS: read surface-map.md
+        FS-->>W: scenarios + priorities
+        W->>FS: write test files
+        W-->>QA: tests + coverage summary
+        end
+
+        rect rgb(225, 245, 238)
+        Note over V: Phase 3 - initial validation
+        QA->>V: invoke with tests + tier
+        V->>Obs: run suite + check signals
+        Obs-->>V: test output + baseline/after metrics
+        V->>FS: write validation-report.md (raw output attached)
+        V-->>QA: PASS / FAIL / BLOCKED
+        end
+
+        loop max 2 correction cycles (entered only on FAIL)
+            QA->>W: re-invoke with failure output
+            W->>FS: update test files
+            W-->>QA: revised tests
+
+            rect rgb(225, 245, 238)
+            Note over V: Phase 3 - re-validate
+            QA->>V: invoke with revised tests + tier
+            V->>Obs: run suite + check signals
+            Obs-->>V: test output + baseline/after metrics
+            V->>FS: update validation-report.md
+            V-->>QA: PASS / FAIL / BLOCKED
+            end
+
+            alt PASS or BLOCKED
+                Note over QA: exit loop
+            end
+        end
+
+        alt BLOCKED
+            QA->>User: HALT - environment/framework issue, see validation report
+
+        else PASS
+            QA->>FS: compile quality-assessment.md
+
+            opt tier != --quick
+                rect rgb(225, 245, 238)
+                Note over C: Phase 4 - curate
+                QA->>C: invoke with all 3 artifacts
+                C->>FS: update memory/<service>.md
+                C-->>QA: curation summary
+                end
+
+                opt Jira MCP connected
+                    QA->>Jira: post Quality Assessment as comment
+                    Jira-->>QA: comment URL
+                end
+            end
+
+            QA->>User: success - artifacts + Jira link (if posted)
+
+        else FAIL after 2 correction cycles
+            QA->>User: HALT - escalate with full validation report
+        end
+    end
