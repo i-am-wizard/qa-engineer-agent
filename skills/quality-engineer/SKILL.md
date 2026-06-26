@@ -48,6 +48,17 @@ Match test type to risk. Default to the **lowest layer of the stack that gives r
 
 UI tests and full end-to-end tests are expensive - reach for them only when verification at a lower layer genuinely cannot give the same confidence. The right distribution emerges from the risk table, not a fixed ratio.
 
+## Architecture mapping
+
+Whenever a change **spans more than two services/modules or crosses an async boundary** (event publication, queue, webhook, background job), the test surface assessment must include a **Mermaid sequence diagram** of the flow - each element in the diagram maps to at least one test scenario. This is not optional polish; the diagram is how cross-service failure modes (partial failure, lost/duplicated events, ordering) become visible before they become incidents.
+
+- **Single-module, linear data flow** → omit the diagram entirely. Do not include an empty Architecture Impact stub.
+- **Crosses a boundary but the other side isn't inferable** → do NOT draw a plausible-but-possibly-wrong diagram. Ask the user for an architecture sketch first.
+
+  "Inferable" is about the *flow*, not about having the repo open. If the user has described the flow - even at a high level like "service writes the file, then enqueues a job a worker consumes" - that IS inferable: draw it now from what they told you (`producer → queue → worker`), and refine once you read the code. Not having the file paths in hand is **not** a reason to defer the diagram. Reach for ask-don't-guess only when a participant's *behaviour or contract is genuinely unknown* - e.g. the consumer lives in another team's repo and its semantics aren't described - and even then, draw the part you do know and mark the unknown side explicitly (e.g. a node labelled `?? consumer (unconfirmed)`) rather than drawing nothing.
+
+See `references/architecture-mapping.md` for diagram-type selection.
+
 ## Acceptance-test-driven development
 
 When a feature is being built (not just tested after the fact), scenarios come first, not last. The reasoning: tests written after implementation tend to re-encode whatever the code happens to do; tests written first anchor on the contract.
@@ -58,7 +69,7 @@ When a feature is being built (not just tested after the fact), scenarios come f
 - A feature is not done until its acceptance tests pass *and* its observability signals are verified
 - For bug fixes: reproduce the bug in a failing test first, fix second. A fix without a regression test is a patch waiting to regress
 
-When no acceptance criteria exist, draft them and confirm with the team before writing tests. Drafting AC retrospectively from code is the failure mode this discipline exists to prevent.
+When no acceptance criteria exist, draft them **as explicit Given/When/Then scenarios** and confirm with the team before writing tests - don't just list bullet-point requirements or jump to implementation. The Given/When/Then form is what forces the contract to be concrete and testable. Drafting AC retrospectively from code is the failure mode this discipline exists to prevent.
 
 ## Failure-mode coverage
 
