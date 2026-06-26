@@ -1,0 +1,28 @@
+name: Copilot layer in sync
+
+# The .github/agents and .github/skills trees are generated from the canonical
+# sources in agents/, commands/ and skills/. This guard fails the build if a
+# source was edited without regenerating, so the two ecosystems never drift.
+
+on:
+  pull_request:
+    paths:
+      - "agents/**"
+      - "commands/**"
+      - "skills/**"
+      - ".github/agents/**"
+      - ".github/skills/**"
+      - "scripts/build-copilot.py"
+  push:
+    branches: [main]
+
+jobs:
+  check-copilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Copilot CLI layer is up to date
+        run: make check-copilot
