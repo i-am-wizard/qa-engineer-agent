@@ -141,6 +141,27 @@
       "prompt": "The change publishes an InventoryDepleted event from the warehouse service. I don't have access to the consumer code - it lives in another team's repo.",
       "expected_trigger": true,
       "expected_behaviour": "Loads quality-engineer. Recognises the async boundary triggers a diagram but the consumer side is not inferable. Asks the user for an architecture sketch or description of the consumer rather than drawing a plausible-but-possibly-wrong diagram."
+    },
+    {
+      "id": "architecture-diagram-skip-two-service-sync",
+      "category": "architecture mapping - boundary guard (v2.2+)",
+      "prompt": "Add tests for a change where the order service makes a synchronous REST call to the pricing service to fetch a quote before saving the order. No events, no queues.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Does NOT generate a Mermaid diagram - the change touches exactly two services over a single synchronous call with no async boundary, which is below the '>2 services OR crosses an async boundary' threshold. May note the integration point as a contract/integration test, but the Architecture Impact section is omitted rather than included as a near-empty stub. Guards against the diagram rule over-triggering after it was promoted into SKILL.md."
+    },
+    {
+      "id": "architecture-diagram-async-two-components",
+      "category": "architecture mapping - boundary guard (v2.2+)",
+      "prompt": "Add tests for a change where the upload service writes the file, then enqueues a ProcessUpload job onto a background queue that a worker later consumes. Help me map the test surface.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. DOES generate a Mermaid diagram even though only two components are involved - the queue is an async boundary, and the 'OR crosses an async boundary' half of the rule fires independently of service count. Diagram shows producer -> queue -> worker, and the test surface covers the async failure modes (job lost after file write, duplicate delivery, worker failure/retry, ordering). Guards that the async half of the threshold is not collapsed into a raw service count."
+    },
+    {
+      "id": "ac-drafting-bullets-not-enough",
+      "category": "doctrine adherence - ATDD form (v2.2+)",
+      "prompt": "Here are the requirements for the new export feature: - users can export to CSV - export respects current filters - large exports run in the background. Write the tests.",
+      "expected_trigger": true,
+      "expected_behaviour": "Loads quality-engineer. Treats the bullet list as raw requirements, NOT as confirmed acceptance criteria. Reframes them into explicit Given/When/Then scenarios (including boundary and failure cases the bullets omit - empty result set, filter producing zero rows, background job failure) and confirms before writing tests. Does NOT write tests directly against the bullet points. Guards that AC must be drafted in Given/When/Then form, the cue promoted into SKILL.md."
     }
   ],
   "running": "These are designed to be run as Claude prompts in a fresh session with this skill installed. For each case, manually verify expected_trigger and expected_behaviour. Cases failing should drive description tuning (for trigger failures) or doctrine clarification in SKILL.md and agents (for behaviour failures)."
