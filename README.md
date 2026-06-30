@@ -1,6 +1,6 @@
 # QA Engineer
 
-A QA agent for Claude Code that reads your Jira ticket, understands your codebase, writes tests grounded in your acceptance criteria, runs them with real evidence, and remembers what it learns for next time.
+A QA agent for Claude Code and GitHub Copilot CLI that reads your Jira ticket, understands your codebase, writes tests grounded in your acceptance criteria, runs them with real evidence, and remembers what it learns for next time.
 
 If you've ever wanted a QA engineer who actually reads the ticket before writing tests, this is that.
 
@@ -36,6 +36,56 @@ After installing, verify it loaded:
 ```
 
 You should see `qa-engineer` listed.
+
+## Using with GitHub Copilot CLI
+
+The same pipeline runs in [GitHub Copilot CLI](https://github.com/features/copilot/cli). The Claude Code plugin (`agents/`, `commands/`, `skills/`) is the source of truth; a generated `.github/` layer exposes it to Copilot as custom agents and a skill. No separate fork, no hosted service.
+
+```bash
+npm install -g @github/copilot
+```
+
+Copilot CLI auto-discovers `.github/agents/` and `.github/skills/` when you run it **from inside this repository** (or any repo that includes the generated tree), so there's nothing to install beyond cloning. To make the agents available everywhere, copy them into your home config instead:
+
+```bash
+cp -r .github/agents/*       ~/.copilot/agents/
+cp -r .github/skills/*       ~/.copilot/skills/
+```
+
+### Invocation mapping
+
+The Claude Code slash commands map to Copilot custom agents. Each agent's name is the filename without `.agent.md`:
+
+| Claude Code | Copilot CLI |
+|---|---|
+| `/qa PROJECT-123` | `copilot --agent qa --prompt "run PROJECT-123"` |
+| `/qa --exhaustive PROJECT-123` | `copilot --agent qa --prompt "run PROJECT-123 --exhaustive"` |
+| `/qa-research PROJECT-123` | `copilot --agent qa-research --prompt "PROJECT-123"` |
+| `/qa-validate` | `copilot --agent qa-validate --prompt "validate the current suite"` |
+
+Inside an interactive Copilot session you can also type `/agent` to pick `qa` from the list, or just describe the work (`"run the QA pipeline on PROJECT-123"`) and let Copilot infer the agent. The four phase agents — `qa-researcher`, `qa-writer`, `qa-validator`, `qa-curator` — are available individually too. The judgement-layer skill loads automatically when quality topics come up, or on demand with `/quality-engineer`.
+
+### Connecting MCPs
+
+Copilot CLI manages MCP servers separately from the plugin, in `~/.copilot/mcp-config.json`. Add the ones from the [MCPs table below](#mcps-youll-want-connected) with:
+
+```bash
+copilot          # start an interactive session
+/mcp add         # fill in the Jira / GitHub / Playwright server, then Ctrl+S
+```
+
+The pipeline degrades gracefully when an MCP is missing, exactly as it does under Claude Code.
+
+### Keeping the two layers in sync (maintainers)
+
+Never edit `.github/agents/` or `.github/skills/` by hand — they're generated. Edit the canonical files under `agents/`, `commands/`, `skills/`, then regenerate:
+
+```bash
+make build-copilot     # regenerate the .github/ tree
+make check-copilot      # verify it's in sync (run in CI)
+```
+
+A GitHub Actions workflow runs `check-copilot` on every PR that touches either layer, so the two can't drift.
 
 ## Quick start
 
